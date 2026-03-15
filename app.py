@@ -1,42 +1,15 @@
 from flask import Flask, render_template, request, redirect, session
 import sqlite3
 from datetime import date
-import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"  # Keep this secret in production!
 
-DB_FILE = "attendance.db"
-
 # ---------------- DATABASE CONNECTION ----------------
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect("attendance.db")
     conn.row_factory = sqlite3.Row
     return conn
-
-# ---------------- INITIALIZE DATABASE ----------------
-def init_db():
-    if not os.path.exists(DB_FILE):
-        conn = sqlite3.connect(DB_FILE)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                email TEXT,
-                password TEXT,
-                role TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS attendance(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id INTEGER,
-                status TEXT,
-                date TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
 
 # ---------------- HOME PAGE ----------------
 @app.route("/")
@@ -140,7 +113,7 @@ def student():
 
     return render_template("student.html", attendance=attendance)
 
-# ---------------- MARK ATTENDANCE (ADMIN ONLY) ----------------
+# ---------------- MARK ATTENDANCE ----------------
 @app.route("/mark/<int:id>/<status>")
 def mark(id, status):
     if session.get("role") != "admin":
@@ -174,6 +147,29 @@ def delete(id):
 def logout():
     session.clear()
     return redirect("/login")
+
+# ---------------- DATABASE SETUP ----------------
+def init_db():
+    conn = sqlite3.connect("attendance.db")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            email TEXT,
+            password TEXT,
+            role TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS attendance(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER,
+            status TEXT,
+            date TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 # ---------------- RUN APP ----------------
 if __name__ == "__main__":
