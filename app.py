@@ -24,10 +24,6 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
         confirm_password = request.form["confirm_password"]
-        name = request.form.get("name", "")
-        age = request.form.get("age", None)
-        course = request.form.get("course", "")
-        city = request.form.get("city", "")
 
         if password != confirm_password:
             return "Passwords do not match"
@@ -35,10 +31,10 @@ def register():
         conn = get_db()
         conn.execute(
             """
-            INSERT INTO users(username,email,password,name,age,course,city,role)
-            VALUES(?,?,?,?,?,?,?,?)
+            INSERT INTO users(username,email,password,role)
+            VALUES(?,?,?,?)
             """,
-            (username, email, password, name, age, course, city, "student")
+            (username, email, password, "student")
         )
         conn.commit()
         conn.close()
@@ -160,10 +156,6 @@ def init_db():
             username TEXT UNIQUE,
             email TEXT,
             password TEXT,
-            name TEXT,
-            age INTEGER,
-            course TEXT,
-            city TEXT,
             role TEXT
         )
     """)
