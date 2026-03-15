@@ -36,7 +36,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ---------------- RUN APP ----------------
+# ---------------- RUN APP ---------------
 if __name__ == "__main__":
     init_db()
     port = int(os.environ.get("PORT", 5000))
