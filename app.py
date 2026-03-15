@@ -3,19 +3,20 @@ import sqlite3
 from datetime import date
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "secret123"  # Keep this secret in production!
 
+# ---------------- DATABASE CONNECTION ----------------
 def get_db():
     conn = sqlite3.connect("attendance.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-# HOME PAGE
+# ---------------- HOME PAGE ----------------
 @app.route("/")
 def home():
     return redirect("/login")
 
-# REGISTER
+# ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -23,14 +24,21 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
         confirm_password = request.form["confirm_password"]
+        name = request.form.get("name", "")
+        age = request.form.get("age", None)
+        course = request.form.get("course", "")
+        city = request.form.get("city", "")
 
         if password != confirm_password:
             return "Passwords do not match"
 
         conn = get_db()
         conn.execute(
-            "INSERT INTO users(username,email,password,role) VALUES(?,?,?,?)",
-            (username, email, password, "student")
+            """
+            INSERT INTO users(username,email,password,name,age,course,city,role)
+            VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (username, email, password, name, age, course, city, "student")
         )
         conn.commit()
         conn.close()
@@ -38,7 +46,7 @@ def register():
 
     return render_template("register.html")
 
-# LOGIN
+# ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -48,7 +56,7 @@ def login():
         conn = get_db()
         user = conn.execute(
             "SELECT * FROM users WHERE username=? AND password=?",
-            (username, password),
+            (username, password)
         ).fetchone()
         conn.close()
 
@@ -66,52 +74,49 @@ def login():
 
     return render_template("login.html")
 
-# ADMIN DASHBOARD
+# ---------------- ADMIN DASHBOARD ----------------
 @app.route("/admin")
 def admin():
     if session.get("role") != "admin":
         return "Access Denied"
 
     conn = get_db()
-    students = conn.execute(
-        "SELECT * FROM users WHERE role='student'"
-    ).fetchall()
-    attendance = conn.execute(
-        """
+    students = conn.execute("SELECT * FROM users WHERE role='student'").fetchall()
+    attendance = conn.execute("""
         SELECT attendance.student_id,
                users.username,
                attendance.status,
                attendance.date
         FROM attendance
         JOIN users ON attendance.student_id = users.id
-        """
-    ).fetchall()
+        ORDER BY attendance.date DESC
+    """).fetchall()
     conn.close()
 
     return render_template("admin.html", students=students, attendance=attendance)
 
-# STUDENT DASHBOARD
+# ---------------- STUDENT DASHBOARD ----------------
 @app.route("/student")
 def student():
     if session.get("role") != "student":
         return "Access Denied"
 
     conn = get_db()
-    attendance = conn.execute(
-        """
+    attendance = conn.execute("""
         SELECT attendance.student_id,
                users.username,
                attendance.status,
                attendance.date
         FROM attendance
         JOIN users ON attendance.student_id = users.id
-        """
-    ).fetchall()
+        WHERE attendance.student_id = ?
+        ORDER BY attendance.date DESC
+    """, (session["user_id"],)).fetchall()
     conn.close()
 
     return render_template("student.html", attendance=attendance)
 
-# MARK ATTENDANCE (ADMIN ONLY)
+# ---------------- MARK ATTENDANCE (ADMIN ONLY) ----------------
 @app.route("/mark/<int:id>/<status>")
 def mark(id, status):
     if session.get("role") != "admin":
@@ -125,10 +130,9 @@ def mark(id, status):
     )
     conn.commit()
     conn.close()
-
     return redirect("/admin")
 
-# DELETE STUDENT + DELETE ATTENDANCE
+# ---------------- DELETE STUDENT + ATTENDANCE ----------------
 @app.route("/delete/<int:id>")
 def delete(id):
     if session.get("role") != "admin":
@@ -139,38 +143,42 @@ def delete(id):
     conn.execute("DELETE FROM users WHERE id=?", (id,))
     conn.commit()
     conn.close()
-
     return redirect("/admin")
 
-# LOGOUT
+# ---------------- LOGOUT ----------------
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
-# DATABASE SETUP
-if __name__ == "__main__":
+# ---------------- DATABASE SETUP ----------------
+def init_db():
     conn = sqlite3.connect("attendance.db")
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
+            username TEXT UNIQUE,
             email TEXT,
             password TEXT,
+            name TEXT,
+            age INTEGER,
+            course TEXT,
+            city TEXT,
             role TEXT
         )
-        """
-    )
-    conn.execute(
-        """
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS attendance(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER,
             status TEXT,
             date TEXT
         )
-        """
-    )
+    """)
+    conn.commit()
     conn.close()
-    app.run(debug=True)
+
+# ---------------- RUN APP ----------------
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=5000, debug=True)
