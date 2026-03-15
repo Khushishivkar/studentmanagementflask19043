@@ -28,16 +28,20 @@ def register():
         if password != confirm_password:
             return "Passwords do not match"
 
-        conn = get_db()
-        conn.execute(
-            """
-            INSERT INTO users(username,email,password,role)
-            VALUES(?,?,?,?)
-            """,
-            (username, email, password, "student")
-        )
-        conn.commit()
-        conn.close()
+        try:
+            conn = get_db()
+            conn.execute(
+                """
+                INSERT INTO users(username,email,password,role)
+                VALUES(?,?,?,?)
+                """,
+                (username, email, password, "student")
+            )
+            conn.commit()
+            conn.close()
+        except sqlite3.IntegrityError:
+            return "Username already exists. Please choose another one."
+
         return redirect("/login")
 
     return render_template("register.html")
